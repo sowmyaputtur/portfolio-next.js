@@ -12,6 +12,7 @@ type Category =
 
 type Product = {
   id: number;
+  sku: number;
   name: string;
   category: Exclude<Category, "All products">;
   price: number;
@@ -23,11 +24,14 @@ type Product = {
   image: string;
   description: string;
   features: string[];
+  inventoryBalance: number;
+  databaseReady: boolean;
 };
 
 const products: Product[] = [
   {
     id: 1,
+    sku: 40001,
     name: "SonicPods Pro",
     category: "Audio",
     price: 3999,
@@ -41,9 +45,12 @@ const products: Product[] = [
     description:
       "Your own little pocket of quiet. These wireless earbuds bring rich, balanced sound and all-day comfort wherever the day takes you.",
     features: ["Active noise cancellation", "30-hour total battery", "Clear-call microphones"],
+    inventoryBalance: 10,
+    databaseReady: true,
   },
   {
     id: 2,
+    sku: 40002,
     name: "Astra One 5G",
     category: "Phones",
     price: 24999,
@@ -57,9 +64,12 @@ const products: Product[] = [
     description:
       "A bright, brilliant display, dependable 5G speed and a camera that catches the little things beautifully. Made for your everyday.",
     features: ["120Hz AMOLED display", "50MP dual camera", "All-day 5000mAh battery"],
+    inventoryBalance: 55,
+    databaseReady: true,
   },
   {
     id: 3,
+    sku: 40003,
     name: "StudioLite Headphones",
     category: "Audio",
     price: 6499,
@@ -73,9 +83,12 @@ const products: Product[] = [
     description:
       "Big, beautiful sound that goes wherever you do. Settle into your favourite album with soft ear cushions and effortless wireless listening.",
     features: ["Up to 40-hour playtime", "Soft memory-foam cushions", "Fast USB-C charging"],
+    inventoryBalance: 0,
+    databaseReady: false,
   },
   {
     id: 4,
+    sku: 40004,
     name: "PixelWatch Active",
     category: "Wearables",
     price: 8999,
@@ -88,9 +101,12 @@ const products: Product[] = [
     description:
       "A little nudge towards feeling your best. Keep an eye on your activity, sleep and notifications without missing a beat.",
     features: ["Heart-rate & sleep tracking", "Water resistant to 5 ATM", "7-day battery life"],
+    inventoryBalance: 0,
+    databaseReady: false,
   },
   {
     id: 5,
+    sku: 40005,
     name: "AeroBook Air 14",
     category: "Computing",
     price: 58990,
@@ -104,9 +120,12 @@ const products: Product[] = [
     description:
       "Light in your bag, ready for the big ideas. A crisp display and smooth performance make this your perfect work-from-anywhere companion.",
     features: ["14-inch full-HD display", "16GB memory, 512GB SSD", "Up to 12 hours battery"],
+    inventoryBalance: 0,
+    databaseReady: false,
   },
   {
     id: 6,
+    sku: 40006,
     name: "Breeze Mini Speaker",
     category: "Audio",
     price: 2499,
@@ -119,9 +138,12 @@ const products: Product[] = [
     description:
       "Small speaker, big weekend energy. Bring your favourite sounds to the balcony, the beach or just the kitchen.",
     features: ["360° room-filling sound", "Water resistant (IPX7)", "12-hour wireless playtime"],
+    inventoryBalance: 0,
+    databaseReady: false,
   },
   {
     id: 7,
+    sku: 40007,
     name: "HomeHub Smart Display",
     category: "Home tech",
     price: 5499,
@@ -135,9 +157,12 @@ const products: Product[] = [
     description:
       "A helpful little screen for the heart of your home. See your reminders, play a playlist or check who's at the door.",
     features: ["Voice assistant built in", "8-inch touch display", "Control compatible smart devices"],
+    inventoryBalance: 0,
+    databaseReady: false,
   },
   {
     id: 8,
+    sku: 40008,
     name: "ChargeMate 65W",
     category: "Computing",
     price: 1899,
@@ -149,6 +174,8 @@ const products: Product[] = [
     description:
       "One neat little charger, fewer things to pack. Power your phone, tablet and laptop from one travel-friendly plug.",
     features: ["65W fast charging", "Dual USB-C ports", "Built-in surge protection"],
+    inventoryBalance: 0,
+    databaseReady: false,
   },
 ];
 
@@ -210,6 +237,11 @@ function formatPrice(price: number) {
 }
 
 export default function Home() {
+  const [catalog, setCatalog] = useState(products);
+  const [catalogHydrated, setCatalogHydrated] = useState(false);
+  const [view, setView] = useState<"shop" | "admin">("shop");
+  const [adminKey, setAdminKey] = useState("");
+  const [inventoryMessage, setInventoryMessage] = useState("");
   const [category, setCategory] = useState<Category>("All products");
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -225,6 +257,40 @@ export default function Home() {
 
   useEffect(() => {
     try {
+      const saved = window.localStorage.getItem("aarohan-catalog");
+      if (saved) {
+        const parsed: unknown = JSON.parse(saved);
+        if (
+          Array.isArray(parsed) &&
+          parsed.every(
+            (item) =>
+              item &&
+              Number.isInteger(item.id) &&
+              Number.isInteger(item.sku) &&
+              typeof item.name === "string" &&
+              Number.isFinite(item.price) &&
+              Number.isInteger(item.inventoryBalance) &&
+              typeof item.databaseReady === "boolean",
+          )
+        ) {
+          setCatalog(parsed as Product[]);
+        }
+      }
+    } catch (error) {
+      console.error("Unable to restore saved inventory.", error);
+    } finally {
+      setCatalogHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (catalogHydrated) {
+      window.localStorage.setItem("aarohan-catalog", JSON.stringify(catalog));
+    }
+  }, [catalog, catalogHydrated]);
+
+  useEffect(() => {
+    try {
       const saved = window.localStorage.getItem("aarohan-cart");
       if (saved) {
         const parsed: unknown = JSON.parse(saved);
@@ -234,7 +300,6 @@ export default function Home() {
             (item) =>
               item &&
               Number.isInteger(item.productId) &&
-              products.some((product) => product.id === item.productId) &&
               Number.isInteger(item.quantity) &&
               item.quantity > 0,
           )
@@ -257,7 +322,7 @@ export default function Home() {
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const result = products.filter((product) => {
+    const result = catalog.filter((product) => {
       const matchesCategory = category === "All products" || product.category === category;
       const matchesSearch =
         !query ||
@@ -270,41 +335,45 @@ export default function Home() {
     if (sort === "price-high") return result.sort((a, b) => b.price - a.price);
     if (sort === "rating") return result.sort((a, b) => b.rating - a.rating);
     return result;
-  }, [category, search, sort]);
+  }, [catalog, category, search, sort]);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartSubtotal = cart.reduce((sum, item) => {
-    const product = products.find((entry) => entry.id === item.productId);
+    const product = catalog.find((entry) => entry.id === item.productId);
     return sum + (product?.price ?? 0) * item.quantity;
   }, 0);
   const shipping = cartSubtotal === 0 || cartSubtotal >= 1999 ? 0 : 99;
   const total = cartSubtotal + shipping;
   const cartProducts = cart.flatMap((item) => {
-    const product = products.find((entry) => entry.id === item.productId);
+    const product = catalog.find((entry) => entry.id === item.productId);
     return product ? [{ ...product, quantity: item.quantity }] : [];
   });
 
   function addToCart(productId: number, quantity = 1) {
+    const product = catalog.find((entry) => entry.id === productId);
+    if (!product || product.inventoryBalance <= 0) return;
     setCart((current) => {
       const existing = current.find((item) => item.productId === productId);
+      const nextQuantity = Math.min(product.inventoryBalance, (existing?.quantity ?? 0) + quantity);
       return existing
         ? current.map((item) =>
             item.productId === productId
-              ? { ...item, quantity: item.quantity + quantity }
+              ? { ...item, quantity: nextQuantity }
               : item,
           )
-        : [...current, { productId, quantity }];
+        : [...current, { productId, quantity: nextQuantity }];
     });
     setSelectedProduct(null);
     setCartOpen(true);
   }
 
   function updateQuantity(productId: number, change: number) {
+    const product = catalog.find((entry) => entry.id === productId);
     setCart((current) =>
       current
         .map((item) =>
           item.productId === productId
-            ? { ...item, quantity: item.quantity + change }
+            ? { ...item, quantity: Math.min(product?.inventoryBalance ?? 0, item.quantity + change) }
             : item,
         )
         .filter((item) => item.quantity > 0),
@@ -315,9 +384,148 @@ export default function Home() {
     setCart((current) => current.filter((item) => item.productId !== productId));
   }
 
-  function placeOrder(event: FormEvent<HTMLFormElement>) {
+  async function submitInventoryAction(action: "INSERT" | "UPDATE" | "DELETE", product: Product) {
+    const response = await fetch("/api/inventory", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-inventory-admin-key": adminKey,
+      },
+      body: JSON.stringify({
+        action,
+        sku: product.sku,
+        itemName: product.name,
+        itemPrice: product.price,
+        inventoryBalance: product.inventoryBalance,
+      }),
+    });
+    if (response.status === 503) return false;
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error ?? "The inventory database update failed.");
+    return true;
+  }
+
+  async function saveProduct(product: Product, previousProduct?: Product) {
+    setInventoryMessage("");
+    try {
+      const action = previousProduct?.databaseReady ? "UPDATE" : "INSERT";
+      const savedToDatabase = await submitInventoryAction(action, product);
+      const updatedProduct = { ...product, databaseReady: savedToDatabase || product.databaseReady };
+      setCatalog((current) => previousProduct
+        ? current.map((item) => item.sku === previousProduct.sku ? updatedProduct : item)
+        : [...current, updatedProduct]);
+      setInventoryMessage(savedToDatabase
+        ? `SKU ${product.sku} saved to the database.`
+        : `SKU ${product.sku} saved in this browser only. Configure SQL Server to sync it.`);
+    } catch (error) {
+      setInventoryMessage(error instanceof Error ? error.message : "Unable to save this item.");
+    }
+  }
+
+  async function deleteProduct(product: Product) {
+    setInventoryMessage("");
+    try {
+      const savedToDatabase = product.databaseReady
+        ? await submitInventoryAction("DELETE", product)
+        : false;
+      setCatalog((current) => current.filter((item) => item.sku !== product.sku));
+      setCart((current) => current.filter((item) => item.productId !== product.id));
+      setInventoryMessage(savedToDatabase
+        ? `SKU ${product.sku} deleted from the database.`
+        : `SKU ${product.sku} removed from this browser only.`);
+    } catch (error) {
+      setInventoryMessage(error instanceof Error ? error.message : "Unable to delete this item.");
+    }
+  }
+
+  function addProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const sku = Number(form.get("sku"));
+    const name = String(form.get("name") ?? "").trim();
+    const price = Number(form.get("price"));
+    const inventoryBalance = Number(form.get("inventoryBalance"));
+    if (!Number.isInteger(sku) || sku <= 0 || catalog.some((product) => product.sku === sku)) {
+      setInventoryMessage("Enter a unique positive whole-number SKU.");
+      return;
+    }
+    if (!name || !Number.isFinite(price) || price < 0 || !Number.isInteger(inventoryBalance) || inventoryBalance < 0) {
+      setInventoryMessage("Enter a name, valid price, and whole-number stock balance.");
+      return;
+    }
+    const product: Product = {
+      id: Math.max(0, ...catalog.map((item) => item.id)) + 1,
+      sku,
+      name,
+      category: "Home tech",
+      price,
+      rating: 0,
+      reviews: 0,
+      color: "#e8e8e5",
+      image: "https://images.unsplash.com/photo-1558089687-f282ffcbc126?auto=format&fit=crop&w=800&q=85",
+      description: "A thoughtful everyday tech essential.",
+      features: [],
+      inventoryBalance,
+      databaseReady: false,
+    };
+    void saveProduct(product);
+    event.currentTarget.reset();
+  }
+
+  async function syncCatalog() {
+    setInventoryMessage("");
+    const pending = catalog.filter((product) => !product.databaseReady);
+    if (pending.length === 0) {
+      setInventoryMessage("All catalog items are marked as synced.");
+      return;
+    }
+    const synced: number[] = [];
+    try {
+      for (const product of pending) {
+        if (!await submitInventoryAction("INSERT", product)) break;
+        synced.push(product.sku);
+      }
+      if (synced.length) {
+        setCatalog((current) => current.map((product) =>
+          synced.includes(product.sku) ? { ...product, databaseReady: true } : product,
+        ));
+      }
+      setInventoryMessage(synced.length === pending.length
+        ? `Synced ${synced.length} catalog items to the database.`
+        : synced.length
+          ? `Synced ${synced.length} items. Configure SQL Server to sync the rest.`
+          : "Database settings are missing. The catalog is available in this browser only.");
+    } catch (error) {
+      setInventoryMessage(error instanceof Error ? error.message : "Unable to sync the catalog.");
+    }
+  }
+
+  async function placeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (cart.length === 0) return;
+    const inventoryUpdates = cart.flatMap((item) => {
+      const product = catalog.find((entry) => entry.id === item.productId);
+      return product ? [{ ...product, inventoryBalance: product.inventoryBalance - item.quantity }] : [];
+    });
+    if (inventoryUpdates.length !== cart.length || inventoryUpdates.some((item) => item.inventoryBalance < 0)) {
+      setInventoryMessage("Some items no longer have enough stock. Please review your bag.");
+      return;
+    }
+    try {
+      const databaseResults = await Promise.all(inventoryUpdates.map((product) =>
+        product.databaseReady && adminKey
+          ? submitInventoryAction("UPDATE", product)
+          : Promise.resolve(false),
+      ));
+      setCatalog((current) => current.map((product) => {
+        const updateIndex = inventoryUpdates.findIndex((item) => item.sku === product.sku);
+        if (updateIndex < 0) return product;
+        return { ...inventoryUpdates[updateIndex], databaseReady: databaseResults[updateIndex] || product.databaseReady };
+      }));
+    } catch (error) {
+      setInventoryMessage(error instanceof Error ? error.message : "Unable to update inventory.");
+      return;
+    }
     setOrderNumber(`AR${Math.floor(100000 + Math.random() * 900000)}`);
     setOrderPlaced(true);
     setCart([]);
@@ -381,6 +589,10 @@ export default function Home() {
               }}
             />
           </label>
+          <div className="view-switch" role="group" aria-label="Choose view">
+            <button className={view === "shop" ? "view-option selected" : "view-option"} onClick={() => setView("shop")}>Shop</button>
+            <button className={view === "admin" ? "view-option selected" : "view-option"} onClick={() => setView("admin")}>Admin</button>
+          </div>
           <button className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${cartCount} items`}>
             <Icon name="bag" size={20} />
             <span className="cart-label">Bag</span>
@@ -389,6 +601,62 @@ export default function Home() {
         </div>
       </header>
 
+      {view === "admin" ? (
+        <section className="admin-section">
+          <div className="admin-heading">
+            <div>
+              <div className="eyebrow"><span className="eyebrow-line" /> STORE MANAGEMENT</div>
+              <h1>Inventory <em>control.</em></h1>
+              <p>Update prices and stock, or sync the catalog with the inventory database.</p>
+            </div>
+            <button className="primary-button" onClick={() => void syncCatalog()}>Sync catalog to database <Icon name="arrow" size={17} /></button>
+          </div>
+          <p className="inventory-message" role="status">{inventoryMessage || "Database sync is available when SQL Server settings are configured."}</p>
+          <label className="admin-key-field">Admin access key<input type="password" autoComplete="off" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} /></label>
+
+          <form className="new-product-form" onSubmit={addProduct}>
+            <h2>Add an item</h2>
+            <label>SKU<input name="sku" type="number" min="1" step="1" required /></label>
+            <label>Item name<input name="name" maxLength={200} required /></label>
+            <label>Price (₹)<input name="price" type="number" min="0" step="0.01" required /></label>
+            <label>Opening stock<input name="inventoryBalance" type="number" min="0" step="1" required /></label>
+            <button className="primary-button" type="submit">Add item <Icon name="plus" size={17} /></button>
+          </form>
+
+          <div className="inventory-table-wrap">
+            <table className="inventory-table">
+              <thead><tr><th>SKU</th><th>Item</th><th>Price and stock</th><th>Availability</th><th>Database</th><th aria-label="Actions" /></tr></thead>
+              <tbody>
+                {catalog.map((product) => (
+                  <tr key={product.sku}>
+                    <td className="inventory-sku">{product.sku}</td>
+                    <td>{product.name}</td>
+                    <td>
+                      <form className="inventory-row-form" onSubmit={(event) => {
+                        event.preventDefault();
+                        const form = new FormData(event.currentTarget);
+                        void saveProduct({
+                          ...product,
+                          price: Number(form.get("price")),
+                          inventoryBalance: Number(form.get("inventoryBalance")),
+                        }, product);
+                      }}>
+                        <label><span>₹</span><input aria-label={`${product.name} price`} name="price" type="number" min="0" step="0.01" defaultValue={product.price} required /></label>
+                        <label><span>Qty</span><input aria-label={`${product.name} inventory balance`} name="inventoryBalance" type="number" min="0" step="1" defaultValue={product.inventoryBalance} required /></label>
+                        <button className="text-button" type="submit">Save</button>
+                      </form>
+                    </td>
+                    <td><span className={product.inventoryBalance > 0 ? "stock-status available" : "stock-status unavailable"}>{product.inventoryBalance > 0 ? "In stock" : "Out of stock"}</span></td>
+                    <td><span className={product.databaseReady ? "database-status synced" : "database-status"}>{product.databaseReady ? "Synced" : "Browser only"}</span></td>
+                    <td><button className="remove-item inventory-delete" onClick={() => void deleteProduct(product)} aria-label={`Delete ${product.name}`}><Icon name="trash" size={17} /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : (
+        <div className="storefront-content">
       <section className="hero">
         <div className="hero-copy">
           <div className="eyebrow"><span className="eyebrow-line" /> A little more you, every day</div>
@@ -463,17 +731,17 @@ export default function Home() {
               <article className="product-card" key={product.id} style={{ animationDelay: `${index * 55}ms` }}>
                 <button className="product-image-button" onClick={() => setSelectedProduct(product)} aria-label={`View ${product.name} details`}>
                   <div className="product-image" style={{ backgroundColor: product.color }}>
-                    {product.badge && <span className="product-badge">{product.badge}</span>}
+                    {(product.inventoryBalance <= 0 || product.badge) && <span className={product.inventoryBalance <= 0 ? "product-badge out-of-stock-badge" : "product-badge"}>{product.inventoryBalance <= 0 ? "OUT OF STOCK" : product.badge}</span>}
                     <img src={product.image} alt={product.name} loading="lazy" />
                     <span className="quick-view">A closer look <Icon name="arrow" size={15} /></span>
                   </div>
                 </button>
-                <div className="product-meta"><span>{product.category}</span><span className="rating">★ <b>{product.rating}</b> ({product.reviews})</span></div>
+                <div className="product-meta"><span>{product.category}</span><span className={product.inventoryBalance > 0 ? "rating stock-in-meta" : "rating stock-out-meta"}>{product.inventoryBalance > 0 ? `In stock · ${product.inventoryBalance}` : "Out of stock"}</span></div>
                 <button className="product-title" onClick={() => setSelectedProduct(product)}>{product.name}</button>
                 <div className="product-bottom">
                   <div className="product-price">{formatPrice(product.price)}{product.oldPrice && <del>{formatPrice(product.oldPrice)}</del>}</div>
-                  <button className="add-button" onClick={() => addToCart(product.id)} aria-label={`Add ${product.name} to bag`}>
-                    <Icon name="plus" size={19} />
+                  <button className="add-button" onClick={() => addToCart(product.id)} aria-label={product.inventoryBalance > 0 ? `Add ${product.name} to bag` : `${product.name} is out of stock`} disabled={product.inventoryBalance <= 0}>
+                    {product.inventoryBalance > 0 ? <Icon name="plus" size={19} /> : <span className="unavailable-dash">−</span>}
                   </button>
                 </div>
               </article>
@@ -500,6 +768,8 @@ export default function Home() {
         <span>Thoughtful tech. Honest prices. Made for your everyday.</span>
         <span>© 2026 Aarohan Electronics</span>
       </footer>
+        </div>
+      )}
 
       {cartOpen && (
         <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false); }}>
@@ -565,7 +835,11 @@ export default function Home() {
               <div className="modal-price">{formatPrice(selectedProduct.price)} {selectedProduct.oldPrice && <del>{formatPrice(selectedProduct.oldPrice)}</del>}</div>
               <p className="modal-description">{selectedProduct.description}</p>
               <ul className="feature-list">{selectedProduct.features.map((feature) => <li key={feature}><span>✓</span>{feature}</li>)}</ul>
-              <button className="primary-button modal-add" onClick={() => addToCart(selectedProduct.id)}>Add to bag <Icon name="arrow" size={17} /></button>
+              {selectedProduct.inventoryBalance > 0 ? (
+                <button className="primary-button modal-add" onClick={() => addToCart(selectedProduct.id)}>Add to bag <Icon name="arrow" size={17} /></button>
+              ) : (
+                <p className="modal-out-of-stock">Out of stock</p>
+              )}
               <p className="modal-delivery">✳ &nbsp;Free delivery on orders over ₹1,999</p>
             </div>
           </section>
